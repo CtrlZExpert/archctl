@@ -55,6 +55,24 @@ func checkUpdates() {
 	
 
 } 
+func checkFailedServices() {
+	cmd := exec.Command("systemctl", "--failed", "--no-legend")
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Println("Failed service: FAILED")
+		return
+	}
+	str := string(output)
+	str = strings.TrimSpace(str)
+	if str == "" {
+		fmt.Println("Failed Serices: 0")
+		return
+	}
+	lines := strings.Split(str, "\n")
+	count := len(lines)
+
+	fmt.Println("Failed Services: ", count)
+}
 
 func checkDisk(path string) {
 	var stat unix.Statfs_t
@@ -76,6 +94,8 @@ func checkDisk(path string) {
 
 }
 
+
+
 func main() {
 	isArch := checkArch()
 	if isArch {
@@ -93,5 +113,6 @@ func main() {
 
 	checkUpdates()
 	checkDisk("/")
+	checkFailedServices()
 
 }
