@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -171,14 +172,14 @@ func checkCPU() {
 
 	totalChange := total2 - total1
 	if totalChange == 0 {
-		fmt.Println("CPU usage: FAILED")
+		fmt.Println("  CPU usage: FAILED")
 		return
 	}
 	idleChange := idle2 - idle1
 	cpuUsage := (1 - (idleChange / totalChange)) * 100
 	status := healthStatus(cpuUsage)
 
-	fmt.Printf(" CPU usage: %.1f%% %s\n", cpuUsage, status)
+	fmt.Printf("  CPU usage: %.1f%% %s\n", cpuUsage, status)
 
 }
 
@@ -212,7 +213,40 @@ func checkUptime() {
 	minutes := remainingSeconds / 60
 
 	fmt.Printf("  Uptime: %d days %d hours %d minutes \n", days, hours, minutes)
+}
 
+func checkAverageLoad() {
+	content, err := os.ReadFile("/proc/loadavg")
+	if err != nil {
+		log.Fatalf("  Failed to read file: %s", err)
+		return
+	}
+	str := string(content)
+	fields := strings.Fields(str)
+	load1, err := strconv.ParseFloat(fields[0],64)
+		if err != nil {
+			fmt.Println("  Error: ", err)
+			return
+	}
+
+	load2, err := strconv.ParseFloat(fields[1],64)
+		if err != nil {
+			fmt.Println("  Error: ", err)
+			return
+	}
+	load3, err := strconv.ParseFloat(fields[2],64)
+		if err != nil {
+			fmt.Println("  Error: ", err)
+			return
+	}
+	cpuCount := runtime.NumCPU()
+
+	loadPercentage := (load1 / float64(cpuCount)) * 100
+	status := healthStatus(loadPercentage)
+
+
+	fmt.Printf("  Load Average: %.1f %.1f %.1f %s\n", load1, load2, load3, status)
+	
 }
 
 func main() {
@@ -242,6 +276,7 @@ func main() {
 	fmt.Println("Health")
 
 	checkCPU()
+	checkAverageLoad()
 	checkDisk("/")
 	checkMemory()
 	checkFailedServices()
