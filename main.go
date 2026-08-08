@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"golang.org/x/sys/unix"
 )
 
 func checkArch() bool {
@@ -52,6 +54,26 @@ func checkUpdates() {
 	fmt.Println("Updates: ", count)
 	
 
+} 
+
+func checkDisk(path string) {
+	var stat unix.Statfs_t
+	
+	err := unix.Statfs(path, &stat)
+	if err != nil {
+		fmt.Println("Disk: FAILED")
+		return
+	}
+	totalSpace := stat.Blocks
+	freeSpace := stat.Bfree
+	availableSpace := stat.Bavail
+
+	totalSpaceUsed := totalSpace - freeSpace
+	usableSpace:= totalSpace - freeSpace + availableSpace
+	perctangeUsed:= (float64(totalSpaceUsed)/float64(usableSpace)) * 100
+
+	fmt.Printf("Disk /: %.1f%% used\n",perctangeUsed)
+
 }
 
 func main() {
@@ -70,5 +92,6 @@ func main() {
 	}
 
 	checkUpdates()
+	checkDisk("/")
 
 }
