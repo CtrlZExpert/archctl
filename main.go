@@ -175,7 +175,15 @@ func checkCPU() {
 	idleChange := idle2 - idle1
 	cpuUsage := (1 - (idleChange / totalChange)) * 100
 
-	fmt.Printf("  CPU usage: %.1f%% \n", cpuUsage)
+	if cpuUsage <= 70 {
+
+		fmt.Printf("  CPU usage: %.1f%% [OK]\n", cpuUsage)
+	} else if cpuUsage <= 85 {
+		fmt.Printf("  CPU usage: %.1f%% [WARNING] \n", cpuUsage)
+	} else {
+
+		fmt.Printf("  CPU usage: %.1f%% [CRITICAL] \n", cpuUsage)
+	}
 
 }
 
