@@ -89,8 +89,9 @@ func checkDisk(path string) {
 	totalSpaceUsed := totalSpace - freeSpace
 	usableSpace := totalSpace - freeSpace + availableSpace
 	perctangeUsed := (float64(totalSpaceUsed) / float64(usableSpace)) * 100
+	status := healthStatus(perctangeUsed)
 
-	fmt.Printf("  Disk /: %.1f%% used\n", perctangeUsed)
+	fmt.Printf("  Disk /: %.1f%% used %s\n", perctangeUsed, status)
 
 }
 func checkMemory() {
@@ -127,7 +128,8 @@ func checkMemory() {
 	}
 	memoryUsed := totalMemory - availableMemory
 	perctangeUsedMem := (memoryUsed / totalMemory) * 100
-	fmt.Printf("  Memory: %.1f%% used \n", perctangeUsedMem)
+	status := healthStatus(perctangeUsedMem)
+	fmt.Printf("  Memory: %.1f%% used %s \n", perctangeUsedMem, status)
 
 }
 
@@ -174,18 +176,23 @@ func checkCPU() {
 	}
 	idleChange := idle2 - idle1
 	cpuUsage := (1 - (idleChange / totalChange)) * 100
+	status := healthStatus(cpuUsage)
 
-	if cpuUsage <= 70 {
+	fmt.Printf(" CPU usage: %.1f%% %s\n", cpuUsage, status)
 
-		fmt.Printf("  CPU usage: %.1f%% [OK]\n", cpuUsage)
-	} else if cpuUsage <= 85 {
-		fmt.Printf("  CPU usage: %.1f%% [WARNING] \n", cpuUsage)
-	} else {
-
-		fmt.Printf("  CPU usage: %.1f%% [CRITICAL] \n", cpuUsage)
-	}
 
 }
+
+func healthStatus(percentage float64) string {	
+	if percentage <= 70 {
+		return "[OK]"
+	} else if percentage <= 85 {
+		return "[WARNING]"
+	} else {
+		return "[CRITICAL]"
+	}
+}
+
 
 func main() {
 
