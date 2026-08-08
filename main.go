@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -14,7 +15,7 @@ import (
 func checkArch() bool {
 	content, err := os.ReadFile("/etc/os-release")
 	if err != nil {
-		log.Fatalf("Failed to read file: %s", err)
+		log.Fatalf("  Failed to read file: %s", err)
 	}
 	archOrNo := strings.Contains(string(content), "ID=arch")
 	
@@ -39,19 +40,19 @@ func checkInternet() bool {
 func checkUpdates() {
 	path, err := exec.LookPath("checkupdates")
 	if err != nil {
-		fmt.Println("Updates: FAILED (checkupdates not installed)")
+		fmt.Println("  Updates: FAILED (checkupdates not installed)")
 		return
 		}
 	cmd := exec.Command(path)
 	output, err := cmd.Output()
 	if err != nil {
-		fmt.Println("Updates: FAILED (checkupdtes not intstalled)")
+		fmt.Println("  Updates: FAILED (checkupdates not intstalled)")
 		return
 	}
 	
 	str := string(output)
 	count := strings.Count(str, "\n")
-	fmt.Println("Updates: ", count)
+	fmt.Println("  Updates: ", count)
 	
 
 } 
@@ -59,19 +60,19 @@ func checkFailedServices() {
 	cmd := exec.Command("systemctl", "--failed", "--no-legend")
 	output, err := cmd.Output()
 	if err != nil {
-		fmt.Println("Failed service: FAILED")
+		fmt.Println("  Failed service: FAILED")
 		return
 	}
 	str := string(output)
 	str = strings.TrimSpace(str)
 	if str == "" {
-		fmt.Println("Failed Serices: 0")
+		fmt.Println("  Failed Serices: 0")
 		return
 	}
 	lines := strings.Split(str, "\n")
 	count := len(lines)
 
-	fmt.Println("Failed Services: ", count)
+	fmt.Println("  Failed Services: ", count)
 }
 
 func checkDisk(path string) {
@@ -79,7 +80,7 @@ func checkDisk(path string) {
 	
 	err := unix.Statfs(path, &stat)
 	if err != nil {
-		fmt.Println("Disk: FAILED")
+		fmt.Println("  Disk: FAILED")
 		return
 	}
 	totalSpace := stat.Blocks
@@ -90,29 +91,82 @@ func checkDisk(path string) {
 	usableSpace:= totalSpace - freeSpace + availableSpace
 	perctangeUsed:= (float64(totalSpaceUsed)/float64(usableSpace)) * 100
 
-	fmt.Printf("Disk /: %.1f%% used\n",perctangeUsed)
+	fmt.Printf("  Disk /: %.1f%% used\n",perctangeUsed)
+
+}
+func checkMemory() {
+	content, err := os.ReadFile("/proc/meminfo")
+	if err != nil {
+		log.Fatalf("  Failed to read file: %s", err)
+	}
+
+	var totalMemory float64
+	var availableMemory float64
+
+	str := string(content)
+	lines := strings.Split(str, "\n")
+	for _, line := range lines {
+		if  strings.HasPrefix(line, "MemTotal:") {
+			fields := strings.Fields(line)
+			value, err := strconv.ParseFloat(fields[1], 64)
+			if err != nil {
+				fmt.Println(" Error: ", err)
+				return
+			}
+			totalMemory = value
+
+		}
+		if strings.HasPrefix(line, "MemAvailable:") {
+			fields := strings.Fields(line)
+			value, err := strconv.ParseFloat(fields[1], 64)
+			if err != nil {
+				fmt.Println("  Error: ", err)
+				return
+			}
+			availableMemory = value
+		}
+	}
+	memoryUsed := totalMemory - availableMemory
+	perctangeUsedMem := (memoryUsed / totalMemory) * 100
+	fmt.Printf("  Memory: %.1f%% used \n", perctangeUsedMem)
 
 }
 
 
 
 func main() {
+
+	fmt.Println("archctl - Arch Linux System Doctor")
+	fmt.Println("____________________________________")
+	fmt.Println()
+	fmt.Println()
+
+
+	fmt.Println("System")
 	isArch := checkArch()
 	if isArch {
-		fmt.Println("Arch Linux: OK")
+		fmt.Println("  Arch Linux: OK")
 	} else {
-		fmt.Println("Arch Linux: FAILED")
+		fmt.Println("  Arch Linux: FAILED")
 	}
 
 	isInternet := checkInternet()
 	if isInternet {
-		fmt.Println("Internet: OK")
+		fmt.Println("  Internet: OK")
 	} else {
-		fmt.Println("Internet: Failed")
+		fmt.Println("  Internet: Failed")
 	}
 
-	checkUpdates()
+	fmt.Println()
+	
+	fmt.Println("Health")
+
 	checkDisk("/")
+	checkMemory()
 	checkFailedServices()
+	fmt.Println()
+
+	fmt.Println("Packages")
+	checkUpdates()
 
 }
