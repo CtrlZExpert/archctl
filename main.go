@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 )
@@ -33,6 +34,26 @@ func checkInternet() bool {
 	return true
 }
 
+func checkUpdates() {
+	path, err := exec.LookPath("checkupdates")
+	if err != nil {
+		fmt.Println("Updates: FAILED (checkupdates not installed)")
+		return
+		}
+	cmd := exec.Command(path)
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Println("Updates: FAILED (checkupdtes not intstalled)")
+		return
+	}
+	
+	str := string(output)
+	count := strings.Count(str, "\n")
+	fmt.Println("Updates: ", count)
+	
+
+}
+
 func main() {
 	isArch := checkArch()
 	if isArch {
@@ -47,5 +68,7 @@ func main() {
 	} else {
 		fmt.Println("Internet: Failed")
 	}
+
+	checkUpdates()
 
 }
