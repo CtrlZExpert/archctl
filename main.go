@@ -66,7 +66,7 @@ func checkFailedServices() {
 	str := string(output)
 	str = strings.TrimSpace(str)
 	if str == "" {
-		fmt.Println("  Failed Serices: 0")
+		fmt.Println("  Failed Services: 0")
 		return
 	}
 	lines := strings.Split(str, "\n")
@@ -223,30 +223,71 @@ func checkAverageLoad() {
 	}
 	str := string(content)
 	fields := strings.Fields(str)
-	load1, err := strconv.ParseFloat(fields[0],64)
-		if err != nil {
-			fmt.Println("  Error: ", err)
-			return
+	load1, err := strconv.ParseFloat(fields[0], 64)
+	if err != nil {
+		fmt.Println("  Error: ", err)
+		return
 	}
 
-	load2, err := strconv.ParseFloat(fields[1],64)
-		if err != nil {
-			fmt.Println("  Error: ", err)
-			return
+	load2, err := strconv.ParseFloat(fields[1], 64)
+	if err != nil {
+		fmt.Println("  Error: ", err)
+		return
 	}
-	load3, err := strconv.ParseFloat(fields[2],64)
-		if err != nil {
-			fmt.Println("  Error: ", err)
-			return
+	load3, err := strconv.ParseFloat(fields[2], 64)
+	if err != nil {
+		fmt.Println("  Error: ", err)
+		return
 	}
 	cpuCount := runtime.NumCPU()
 
 	loadPercentage := (load1 / float64(cpuCount)) * 100
 	status := healthStatus(loadPercentage)
 
-
 	fmt.Printf("  Load Average: %.1f %.1f %.1f %s\n", load1, load2, load3, status)
-	
+
+}
+
+func checkSwap() {
+	content, err := os.ReadFile("/proc/meminfo")
+	if err != nil {
+		log.Fatalf(" Failed to read file: %s ", err)
+		return
+	}
+	var swapTotal float64
+	var swapFree float64
+	str := string(content)
+	lines := strings.Split(str, "\n")
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if strings.HasPrefix(line, "SwapTotal:") {
+			value, err := strconv.ParseFloat(fields[1], 64)
+			if err != nil {
+				fmt.Println(" Error: ", err)
+				return
+			}
+			swapTotal = value
+		}
+		if strings.HasPrefix(line, "SwapFree:") {
+			value, err := strconv.ParseFloat(fields[1], 64)
+			if err != nil {
+				fmt.Println("  Error: ", err)
+				return
+			}
+			swapFree = value
+		}
+	}
+	if swapTotal == 0 {
+		fmt.Println("  Swap: Not configured")
+		return
+	}
+
+	usedSwap := swapTotal - swapFree
+	swapPerctangeUsed := (usedSwap / swapTotal) * 100
+	status := healthStatus(swapPerctangeUsed)
+
+	fmt.Printf("  Swap %.1f%% used %s\n", swapPerctangeUsed, status)
+
 }
 
 func main() {
@@ -279,6 +320,7 @@ func main() {
 	checkAverageLoad()
 	checkDisk("/")
 	checkMemory()
+	checkSwap()
 	checkFailedServices()
 	checkUptime()
 	fmt.Println()
