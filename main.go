@@ -180,10 +180,9 @@ func checkCPU() {
 
 	fmt.Printf(" CPU usage: %.1f%% %s\n", cpuUsage, status)
 
-
 }
 
-func healthStatus(percentage float64) string {	
+func healthStatus(percentage float64) string {
 	if percentage <= 70 {
 		return "[OK]"
 	} else if percentage <= 85 {
@@ -193,6 +192,28 @@ func healthStatus(percentage float64) string {
 	}
 }
 
+func checkUptime() {
+	content, err := os.ReadFile("/proc/uptime")
+	if err != nil {
+		log.Fatalf("  Failed to read file: %s", err)
+		return
+	}
+	str := string(content)
+	fields := strings.Fields(str)
+	totalSeconds, err := strconv.ParseFloat(fields[0], 64)
+	if err != nil {
+		fmt.Println(" Error: ", err)
+		return
+	}
+	days := int64(totalSeconds) / 86400
+	remainingSeconds := int64(totalSeconds) % 86400
+	hours := remainingSeconds / 3600
+	remainingSeconds = remainingSeconds % 3600
+	minutes := remainingSeconds / 60
+
+	fmt.Printf("  Uptime: %d days %d hours %d minutes \n", days, hours, minutes)
+
+}
 
 func main() {
 
@@ -224,6 +245,7 @@ func main() {
 	checkDisk("/")
 	checkMemory()
 	checkFailedServices()
+	checkUptime()
 	fmt.Println()
 
 	fmt.Println("Packages")
