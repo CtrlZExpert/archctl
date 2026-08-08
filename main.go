@@ -1,4 +1,5 @@
 package main
+
 import (
 	"fmt"
 	"log"
@@ -18,11 +19,10 @@ func checkArch() bool {
 		log.Fatalf("  Failed to read file: %s", err)
 	}
 	archOrNo := strings.Contains(string(content), "ID=arch")
-	
-	return archOrNo
-	
-}
 
+	return archOrNo
+
+}
 
 func checkInternet() bool {
 	client := http.Client{
@@ -42,20 +42,19 @@ func checkUpdates() {
 	if err != nil {
 		fmt.Println("  Updates: FAILED (checkupdates not installed)")
 		return
-		}
+	}
 	cmd := exec.Command(path)
 	output, err := cmd.Output()
 	if err != nil {
 		fmt.Println("  Updates: FAILED (checkupdates not intstalled)")
 		return
 	}
-	
+
 	str := string(output)
 	count := strings.Count(str, "\n")
 	fmt.Println("  Updates: ", count)
-	
 
-} 
+}
 func checkFailedServices() {
 	cmd := exec.Command("systemctl", "--failed", "--no-legend")
 	output, err := cmd.Output()
@@ -77,7 +76,7 @@ func checkFailedServices() {
 
 func checkDisk(path string) {
 	var stat unix.Statfs_t
-	
+
 	err := unix.Statfs(path, &stat)
 	if err != nil {
 		fmt.Println("  Disk: FAILED")
@@ -88,10 +87,10 @@ func checkDisk(path string) {
 	availableSpace := stat.Bavail
 
 	totalSpaceUsed := totalSpace - freeSpace
-	usableSpace:= totalSpace - freeSpace + availableSpace
-	perctangeUsed:= (float64(totalSpaceUsed)/float64(usableSpace)) * 100
+	usableSpace := totalSpace - freeSpace + availableSpace
+	perctangeUsed := (float64(totalSpaceUsed) / float64(usableSpace)) * 100
 
-	fmt.Printf("  Disk /: %.1f%% used\n",perctangeUsed)
+	fmt.Printf("  Disk /: %.1f%% used\n", perctangeUsed)
 
 }
 func checkMemory() {
@@ -106,7 +105,7 @@ func checkMemory() {
 	str := string(content)
 	lines := strings.Split(str, "\n")
 	for _, line := range lines {
-		if  strings.HasPrefix(line, "MemTotal:") {
+		if strings.HasPrefix(line, "MemTotal:") {
 			fields := strings.Fields(line)
 			value, err := strconv.ParseFloat(fields[1], 64)
 			if err != nil {
@@ -132,7 +131,53 @@ func checkMemory() {
 
 }
 
+func readCPUStats() (totalTime float64, idleTime float64) {
+	content, err := os.ReadFile("/proc/stat")
+	if err != nil {
+		log.Fatalf(" Failed to read file: %s", err)
+	}
+	var values []float64
+	str := string(content)
+	lines := strings.Split(str, "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "cpu ") {
+			fields := strings.Fields(line)
+			for _, field := range fields[1:] {
+				value, err := strconv.ParseFloat(field, 64)
+				if err != nil {
+					fmt.Println("  Error: ", err)
+					return
+				}
+				values = append(values, value)
+			}
+		}
+	}
+	for _, value := range values {
+		totalTime += value
+	}
+	idle := values[3]
+	iowait := values[4]
+	idleTime = idle + iowait
+	return totalTime, idleTime
+}
 
+func checkCPU() {
+
+	total1, idle1 := readCPUStats()
+	time.Sleep(1 * time.Second)
+	total2, idle2 := readCPUStats()
+
+	totalChange := total2 - total1
+	if totalChange == 0 {
+		fmt.Println("CPU usage: FAILED")
+		return
+	}
+	idleChange := idle2 - idle1
+	cpuUsage := (1 - (idleChange / totalChange)) * 100
+
+	fmt.Printf("  CPU usage: %.1f%% \n", cpuUsage)
+
+}
 
 func main() {
 
@@ -140,7 +185,6 @@ func main() {
 	fmt.Println("____________________________________")
 	fmt.Println()
 	fmt.Println()
-
 
 	fmt.Println("System")
 	isArch := checkArch()
@@ -158,9 +202,10 @@ func main() {
 	}
 
 	fmt.Println()
-	
+
 	fmt.Println("Health")
 
+	checkCPU()
 	checkDisk("/")
 	checkMemory()
 	checkFailedServices()
