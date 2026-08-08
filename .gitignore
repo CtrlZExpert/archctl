@@ -1,4 +1,6 @@
 archctl
+main
+archctl
 *.log
 .env
 *.swp
