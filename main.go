@@ -123,7 +123,7 @@ func checkMemory() {
 			fields := strings.Fields(line)
 			value, err := strconv.ParseFloat(fields[1], 64)
 			if err != nil {
-				fmt.Println("  Error: ", err)
+				fmt.Println("  Error:", err)
 				return
 			}
 			availableMemory = value
@@ -150,7 +150,7 @@ func readCPUStats() (totalTime float64, idleTime float64) {
 			for _, field := range fields[1:] {
 				value, err := strconv.ParseFloat(field, 64)
 				if err != nil {
-					fmt.Println("  Error: ", err)
+					fmt.Println("  Error:", err)
 					return
 				}
 				values = append(values, value)
@@ -237,18 +237,18 @@ func checkAverageLoad() {
 	fields := strings.Fields(str)
 	load1, err := strconv.ParseFloat(fields[0], 64)
 	if err != nil {
-		fmt.Println("  Error: ", err)
+		fmt.Println("  Error:", err)
 		return
 	}
 
 	load2, err := strconv.ParseFloat(fields[1], 64)
 	if err != nil {
-		fmt.Println("  Error: ", err)
+		fmt.Println("  Error:", err)
 		return
 	}
 	load3, err := strconv.ParseFloat(fields[2], 64)
 	if err != nil {
-		fmt.Println("  Error: ", err)
+		fmt.Println("  Error:", err)
 		return
 	}
 	cpuCount := runtime.NumCPU()
@@ -283,7 +283,7 @@ func checkSwap() {
 		if strings.HasPrefix(line, "SwapFree:") {
 			value, err := strconv.ParseFloat(fields[1], 64)
 			if err != nil {
-				fmt.Println("  Error: ", err)
+				fmt.Println("  Error:", err)
 				return
 			}
 			swapFree = value
@@ -312,18 +312,18 @@ func getRunningKernel() (string, error) {
 }
 
 func checkRebootRequired() bool {
-	unameStr,err := getRunningKernel()
+	unameStr, err := getRunningKernel()
 	if err != nil {
-		fmt.Println("  Error: %s", err)
+		fmt.Println("  Error:", err)
 		return false
 	}
-	
+
 	unameKernel := strings.TrimSpace(unameStr)
 
 	pacmanCmd := exec.Command("pacman", "-Q", "linux")
 	pacmanOutput, err := pacmanCmd.Output()
 	if err != nil {
-		fmt.Println(" Error: %s", err)
+		fmt.Println(" Error:", err)
 		return false
 	}
 	pacmanStr := string(pacmanOutput)
@@ -333,10 +333,9 @@ func checkRebootRequired() bool {
 	if unameKernel != pacmanKernel {
 		return true
 	}
-	
+
 	return false
 }
-
 
 func main() {
 
@@ -352,6 +351,12 @@ func main() {
 	} else {
 		fmt.Println("  Arch Linux: FAILED")
 	}
+	currentKernel, err := getRunningKernel()
+	if err != nil {
+		fmt.Println(" Error:", err)
+		return
+	}
+	fmt.Println("  Kernel:", currentKernel)
 
 	isInternet, elapsed := checkInternet()
 	if isInternet {
