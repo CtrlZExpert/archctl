@@ -301,15 +301,23 @@ func checkSwap() {
 	fmt.Printf("  Swap %.1f%% used %s\n", swapPerctangeUsed, status)
 
 }
+func getRunningKernel() (string, error) {
+	cmd := exec.Command("uname", "-r")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	str := string(output)
+	return str, nil
+}
 
 func checkRebootRequired() bool {
-	unameCmd := exec.Command("uname", "-r")
-	unameOutput, err := unameCmd.Output()
+	unameStr,err := getRunningKernel()
 	if err != nil {
 		fmt.Println("  Error: %s", err)
 		return false
 	}
-	unameStr := string(unameOutput)
+	
 	unameKernel := strings.TrimSpace(unameStr)
 
 	pacmanCmd := exec.Command("pacman", "-Q", "linux")
@@ -328,6 +336,7 @@ func checkRebootRequired() bool {
 	
 	return false
 }
+
 
 func main() {
 
