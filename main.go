@@ -25,17 +25,19 @@ func checkArch() bool {
 
 }
 
-func checkInternet() bool {
+func checkInternet() (bool, int64) {
+	start := time.Now()
 	client := http.Client{
 		Timeout: 3 * time.Second,
 	}
 	resp, err := client.Get("https://google.com")
 	if err != nil {
-		return false
+		return false, 0
 	}
 	defer resp.Body.Close()
+	elapsed := time.Since(start).Milliseconds()
 
-	return true
+	return true, elapsed
 }
 
 func checkUpdates() {
@@ -193,6 +195,16 @@ func healthStatus(percentage float64) string {
 	}
 }
 
+func latencyStatus(latency int64) string {
+	if latency <= 300 {
+		return "[OK]"
+	} else if latency <= 1000 {
+		return "[WARNING]"
+	} else {
+		return "[CRITICAL]"
+	}
+}
+
 func checkUptime() {
 	content, err := os.ReadFile("/proc/uptime")
 	if err != nil {
@@ -305,9 +317,11 @@ func main() {
 		fmt.Println("  Arch Linux: FAILED")
 	}
 
-	isInternet := checkInternet()
+	isInternet, elapsed := checkInternet()
 	if isInternet {
+		status := latencyStatus(elapsed)
 		fmt.Println("  Internet: OK")
+		fmt.Printf("  Latency: %d ms %s\n", elapsed, status)
 	} else {
 		fmt.Println("  Internet: Failed")
 	}
