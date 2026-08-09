@@ -302,6 +302,33 @@ func checkSwap() {
 
 }
 
+func checkRebootRequired() bool {
+	unameCmd := exec.Command("uname", "-r")
+	unameOutput, err := unameCmd.Output()
+	if err != nil {
+		fmt.Println("  Error: %s", err)
+		return false
+	}
+	unameStr := string(unameOutput)
+	unameKernel := strings.TrimSpace(unameStr)
+
+	pacmanCmd := exec.Command("pacman", "-Q", "linux")
+	pacmanOutput, err := pacmanCmd.Output()
+	if err != nil {
+		fmt.Println(" Error: %s", err)
+		return false
+	}
+	pacmanStr := string(pacmanOutput)
+	pacmanFields := strings.Fields(pacmanStr)
+	pacmanField := pacmanFields[1]
+	pacmanKernel := strings.Replace(pacmanField, ".arch", "-arch", 1)
+	if unameKernel != pacmanKernel {
+		return true
+	}
+	
+	return false
+}
+
 func main() {
 
 	fmt.Println("archctl - Arch Linux System Doctor")
@@ -341,5 +368,11 @@ func main() {
 
 	fmt.Println("Packages")
 	checkUpdates()
+	rebootRequired := checkRebootRequired()
+	if rebootRequired {
+		fmt.Println("  Reboot Required: Yes")
+	} else {
+		fmt.Println("  Reboot Required: No")
+	}
 
 }
