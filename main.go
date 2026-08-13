@@ -450,6 +450,46 @@ func tempStatus( temp float64) string{
 	}
 }
 
+func checkJounalErrors(){
+	cmd := exec.Command(
+		"journalctl",
+		"-p",
+		"err",
+		"--since",
+		"1 hour ago",
+		"--no-pager",
+	)
+
+	var count int
+
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Println("  Error:",err)
+		return
+	}
+	journalStr := strings.TrimSpace(string(output))
+	if journalStr == "" {
+		count = 0
+	} else{
+		lines := strings.Split(journalStr, "\n")
+		count = len(lines)
+	}
+	status := journalStatus(count)
+	fmt.Printf("  Journal Errors (1h): %d %s\n", count, status)
+
+}
+
+func journalStatus(count int) string {
+	if count == 0 {
+		return "[OK]"
+	} else if count >= 1 && count <=5 {
+		return "[WARNING]"
+		
+	} else {
+		return "[CRITICAL]"
+	}
+}
+
 func main() {
 
 	fmt.Println("archctl - Arch Linux System Doctor")
@@ -496,6 +536,7 @@ func main() {
 	checkMemory()
 	checkSwap()
 	checkFailedServices()
+	checkJounalErrors()
 	checkUptime()
 	fmt.Println()
 
