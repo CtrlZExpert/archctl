@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -94,9 +95,74 @@ func checkDisk(path string) {
 	perctangeUsed := (float64(totalSpaceUsed) / float64(usableSpace)) * 100
 	status := healthStatus(perctangeUsed)
 
-	fmt.Printf("  Disk /: %.1f%% used %s\n", perctangeUsed, status)
+	fmt.Printf("  Disk %s: %.1f%% used %s\n",path, perctangeUsed, status)
 
 }
+
+func getFileSystem() {
+	cmd := exec.Command("findmnt", "-rn", "-o", "TARGET,SOURCE,FSTYPE")
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Println("  Error:", err)
+		return
+	}
+	var rootTarget string
+	var homeTarget string
+	var bootTarget string	
+	var rootSource string
+	var homeSource string
+	var bootSource string
+	var rootFSType string
+	var homeFSType string
+	var bootFSType string
+
+
+	outputStr := string(output)
+	
+
+	lines := strings.Split(outputStr, "\n")
+	for _, line := range lines{
+		fields:= strings.Fields(line)
+		if len(fields) == 0{
+			continue
+		}
+		if fields[0] == "/"{
+			rootTarget = fields[0]
+			rootSource = fields[1]
+			rootFSType = fields[2]
+		}
+		if fields[0] == "/home" {
+			homeTarget =fields[0]	
+			homeSource = fields[1]
+			homeFSType = fields[2]
+
+		}
+		if fields[0] == "/boot" {
+			bootTarget = fields[0]
+			bootSource = fields[1]
+			bootFSType = fields[2]
+
+		}
+
+		if rootFSType  == "btrfs"{
+			rootSource = strings.Replace(rootSource, "[/@]", "", 1)
+			homeSource = strings.Replace(homeSource, "[/@home]", "", 1)
+		}	
+	}	
+
+	fmt.Printf("  %s %s %s\n", rootTarget, rootSource, rootFSType)	
+	checkDisk("/")
+
+	if rootSource != homeSource {
+		fmt.Printf("  %s %s %s\n", homeTarget, homeSource, homeFSType)
+		checkDisk("/home")	
+	} 
+
+	fmt.Printf("  %s %s %s\n", bootTarget, bootSource, bootFSType)		
+	checkDisk("/boot")
+
+}
+
 func checkMemory() {
 	content, err := os.ReadFile("/proc/meminfo")
 	if err != nil {
@@ -337,6 +403,53 @@ func checkRebootRequired() bool {
 	return false
 }
 
+func checkTemp(){
+	paths, err := filepath.Glob("/sys/class/hwmon/hwmon*")
+	if err != nil {
+		fmt.Println("  Error:", err)
+		return
+	}
+
+
+	for _, path := range paths {
+		namePath := filepath.Join(path, "name")
+
+		content, err := os.ReadFile(namePath)
+		if err != nil{
+			fmt.Println("  Error:", err)
+			return
+		}
+		name := strings.TrimSpace(string(content))
+		if name == "coretemp"{
+			tempPath := filepath.Join(path, "temp1_input")
+			tempContent, err := os.ReadFile(tempPath)
+			if err != nil {
+				fmt.Println(" Error:", err)
+				return
+			}
+			tempStr := strings.TrimSpace(string(tempContent))
+			temp, err := strconv.ParseFloat(tempStr, 64)
+			if err != nil {
+				fmt.Println("  Error:", err)
+				return
+			}
+			temp = temp / 1000
+			status := tempStatus(temp)
+			fmt.Printf("  CPU Temp: %v°C  %s\n", temp, status)
+		}
+	}
+}
+
+func tempStatus( temp float64) string{
+	if temp <= 70 {
+		return "[OK]"
+	} else if temp <= 85 {
+		return "[WARNING]"
+	} else {
+		return "[CRITICAL]"
+	}
+}
+
 func main() {
 
 	fmt.Println("archctl - Arch Linux System Doctor")
@@ -368,11 +481,17 @@ func main() {
 	}
 
 	fmt.Println()
+	fmt.Println("Filesytem")
+	getFileSystem()
+	fmt.Println()
+
 
 	fmt.Println("Health")
 
 	checkCPU()
+	checkTemp()
 	checkAverageLoad()
+	
 	checkDisk("/")
 	checkMemory()
 	checkSwap()
