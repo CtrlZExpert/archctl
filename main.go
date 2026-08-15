@@ -41,22 +41,23 @@ func checkInternet() (bool, int64) {
 	return true, elapsed
 }
 
-func checkUpdates() {
+func checkUpdates() int {
 	path, err := exec.LookPath("checkupdates")
 	if err != nil {
 		fmt.Println("  Updates: FAILED (checkupdates not installed)")
-		return
+		return 0
 	}
 	cmd := exec.Command(path)
 	output, err := cmd.Output()
 	if err != nil {
 		fmt.Println("  Updates: FAILED (checkupdates not intstalled)")
-		return
+		return 0
 	}
 
 	str := string(output)
 	count := strings.Count(str, "\n")
 	fmt.Println("  Updates: ", count)
+	return count
 
 }
 func checkFailedServices() string {
@@ -600,6 +601,64 @@ func runPackages() {
 	}
 
 }
+func runUpdates() {
+	fmt.Println("Sytem Update")
+	numUpdates := checkUpdates()
+	if numUpdates == 0 {
+		fmt.Println("  System is up to date")
+		return
+	}
+	if numUpdates > 0 {
+		for {
+			fmt.Print("  Would you like to update your system? (yes/no): ")
+			var answer string
+			fmt.Scan(&answer)
+			answer = strings.ToLower(answer)
+			if answer == "yes" || answer == "y" {
+				cmd := exec.Command("sudo", "pacman", "-Syu")
+				cmd.Stdin = os.Stdin
+				cmd.Stdout = os.Stdout
+				cmd.Stderr = os.Stderr
+				err := cmd.Run()
+				if err != nil {
+					fmt.Println("  Error:", err)
+					return
+				}
+				fmt.Println("  System update completed successfully")
+				runPackages()
+				return
+			}
+			if answer == "no" || answer == "n" {
+				fmt.Println("  Update cancelled")
+				return
+			}
+			if answer != "yes" && answer != "y" && answer != "no" && answer != "n" {
+				fmt.Printf("  Error: unexpected answer %q found\n", answer)
+				fmt.Println()
+				fmt.Print("  yes(y) / no(n): ")
+				fmt.Println()
+
+			}
+
+		}
+	}
+
+}
+
+func printHelp() {
+	fmt.Println("Usage:")
+	fmt.Println("  archctl <command>")
+	fmt.Println()
+	fmt.Println("Commands:")
+	fmt.Println("  doctor    Run full system health chehck")
+	fmt.Println("  health    Run health check")
+	fmt.Println("  system    Show system information")
+	fmt.Println("  packages  Show package/update status")
+	fmt.Println("Options:")
+	fmt.Println("  --help    Show this help message")
+	fmt.Println(" --version Show archctl version")
+
+}
 
 func printVersion() {
 	fmt.Println("archctl v.0.1.0")
@@ -615,11 +674,9 @@ func main() {
 
 		fmt.Println("Error: missing command")
 		fmt.Println()
-		fmt.Println("Usage:")
-		fmt.Println("  archctl <command>")
+		fmt.Println("Usage: archctl <command>")
 		fmt.Println()
-		fmt.Println("Example:")
-		fmt.Println("  archctl doctor")
+		fmt.Println("For more information, try --help")
 		return
 	}
 
@@ -627,25 +684,16 @@ func main() {
 	switch command {
 	case "doctor":
 		runDoctor()
-	case "--help":
-		fmt.Println("Usage:")
-		fmt.Println("  archctl <command>")
-		fmt.Println()
-
-		fmt.Println("Commands:")
-		fmt.Println("  doctor    Run full system health chehck")
-		fmt.Println("  health    Run health check")
-		fmt.Println("  system    Show system information")
-		fmt.Println("  packages  Show package/update status")
-		fmt.Println("Options:")
-		fmt.Println("  --help    Show this help message")
-		fmt.Println(" --version Show archctl version")
 	case "health":
 		printHealth()
 	case "system":
 		runSystem()
 	case "packages":
 		runPackages()
+	case "update":
+		runUpdates()
+	case "--help":
+		printHelp()
 	case "--version":
 		printVersion()
 
