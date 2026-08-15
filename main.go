@@ -70,7 +70,7 @@ func checkFailedServices() string {
 	str = strings.TrimSpace(str)
 	if str == "" {
 		fmt.Println("  Failed Services: 0")
-		return "[ERROR]"
+		return "[OK]"
 	}
 	lines := strings.Split(str, "\n")
 	count := len(lines)
@@ -211,7 +211,7 @@ func checkMemory() string {
 func readCPUStats() (totalTime float64, idleTime float64) {
 	content, err := os.ReadFile("/proc/stat")
 	if err != nil {
-		log.Fatalf(" Failed to read file: %s", err)
+		fmt.Println("  Failed to read file: ", err)
 	}
 	var values []float64
 	str := string(content)
@@ -303,7 +303,7 @@ func checkUptime() {
 func checkAverageLoad() string {
 	content, err := os.ReadFile("/proc/loadavg")
 	if err != nil {
-		log.Fatalf("  Failed to read file: %s", err)
+		fmt.Println("  Error:", err)
 		return "[ERROR]"
 	}
 	str := string(content)
@@ -517,14 +517,53 @@ func overAllHealth(statuses []string) string {
 	}
 	return overall
 }
+func runDoctor() {
 
-func main() {
-
-	fmt.Println("archctl - Arch Linux System Doctor")
-	fmt.Println("____________________________________")
+	runSystem()
 	fmt.Println()
 	fmt.Println()
+	fmt.Println("Filesytem")
+	getFileSystem()
+	fmt.Println()
+	printHealth()
+	fmt.Println()
+	runPackages()
+}
 
+func runHealth() []string {
+
+	fmt.Println("Health")
+	cpuStatus := checkCPU()
+	tempStatus := checkTemp()
+	loadStatus := checkAverageLoad()
+	diskStatus := checkDisk("/")
+	memoryStatus := checkMemory()
+	swapStatus := checkSwap()
+	failedServiceStatus := checkFailedServices()
+	jounrnalStatus := checkJounalErrors()
+	checkUptime()
+	fmt.Println()
+	statuses := []string{
+		cpuStatus,
+		tempStatus,
+		memoryStatus,
+		swapStatus,
+		loadStatus,
+		diskStatus,
+		failedServiceStatus,
+		jounrnalStatus,
+	}
+	return statuses
+
+}
+
+func printHealth() {
+	statuses := runHealth()
+	overall := overAllHealth(statuses)
+	fmt.Println("Overall Health:", overall)
+
+}
+func runSystem() {
 	fmt.Println("System")
 	isArch := checkArch()
 	if isArch {
@@ -548,38 +587,9 @@ func main() {
 		fmt.Println("  Internet: Failed")
 	}
 
-	fmt.Println()
-	fmt.Println("Filesytem")
-	getFileSystem()
-	fmt.Println()
+}
 
-	fmt.Println("Health")
-
-	cpuStatus := checkCPU()
-	tempStatus := checkTemp()
-	loadStatus := checkAverageLoad()
-
-	diskStatus := checkDisk("/")
-	memoryStatus := checkMemory()
-	swapStatus := checkSwap()
-	failedServiceStatus := checkFailedServices()
-	jounrnalStatus := checkJounalErrors()
-	checkUptime()
-	fmt.Println()
-
-	statuses := []string{
-		cpuStatus,
-		tempStatus,
-		memoryStatus,
-		swapStatus,
-		loadStatus,
-		diskStatus,
-		failedServiceStatus,
-		jounrnalStatus,
-	}
-	overall := overAllHealth(statuses)
-	fmt.Println("Overall Health:", overall)
-
+func runPackages() {
 	fmt.Println("Packages")
 	checkUpdates()
 	rebootRequired := checkRebootRequired()
@@ -587,6 +597,63 @@ func main() {
 		fmt.Println("  Reboot Required: Yes")
 	} else {
 		fmt.Println("  Reboot Required: No")
+	}
+
+}
+
+func printVersion() {
+	fmt.Println("archctl v.0.1.0")
+}
+
+func main() {
+	fmt.Println("archctl - Arch Linux System Doctor")
+	fmt.Println("____________________________________")
+	fmt.Println()
+	fmt.Println()
+
+	if len(os.Args) < 2 {
+
+		fmt.Println("Error: missing command")
+		fmt.Println()
+		fmt.Println("Usage:")
+		fmt.Println("  archctl <command>")
+		fmt.Println()
+		fmt.Println("Example:")
+		fmt.Println("  archctl doctor")
+		return
+	}
+
+	command := os.Args[1]
+	switch command {
+	case "doctor":
+		runDoctor()
+	case "--help":
+		fmt.Println("Usage:")
+		fmt.Println("  archctl <command>")
+		fmt.Println()
+
+		fmt.Println("Commands:")
+		fmt.Println("  doctor    Run full system health chehck")
+		fmt.Println("  health    Run health check")
+		fmt.Println("  system    Show system information")
+		fmt.Println("  packages  Show package/update status")
+		fmt.Println("Options:")
+		fmt.Println("  --help    Show this help message")
+		fmt.Println(" --version Show archctl version")
+	case "health":
+		printHealth()
+	case "system":
+		runSystem()
+	case "packages":
+		runPackages()
+	case "--version":
+		printVersion()
+
+	default:
+		fmt.Printf("Error: command %q not found\n", command)
+		fmt.Println()
+		fmt.Println("Run 'archctl help' for available commands")
+
 	}
 
 }
