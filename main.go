@@ -59,32 +59,33 @@ func checkUpdates() {
 	fmt.Println("  Updates: ", count)
 
 }
-func checkFailedServices() {
+func checkFailedServices() string {
 	cmd := exec.Command("systemctl", "--failed", "--no-legend")
 	output, err := cmd.Output()
 	if err != nil {
 		fmt.Println("  Failed service: FAILED")
-		return
+		return "[ERROR]"
 	}
 	str := string(output)
 	str = strings.TrimSpace(str)
 	if str == "" {
 		fmt.Println("  Failed Services: 0")
-		return
+		return "[ERROR]"
 	}
 	lines := strings.Split(str, "\n")
 	count := len(lines)
-
-	fmt.Println("  Failed Services: ", count)
+	status := countStatus(count)
+	fmt.Printf("  Failed Services: %d %s\n", count, status)
+	return status
 }
 
-func checkDisk(path string) {
+func checkDisk(path string) string {
 	var stat unix.Statfs_t
 
 	err := unix.Statfs(path, &stat)
 	if err != nil {
 		fmt.Println("  Disk: FAILED")
-		return
+		return "[ERROR]"
 	}
 	totalSpace := stat.Blocks
 	freeSpace := stat.Bfree
@@ -95,7 +96,8 @@ func checkDisk(path string) {
 	perctangeUsed := (float64(totalSpaceUsed) / float64(usableSpace)) * 100
 	status := healthStatus(perctangeUsed)
 
-	fmt.Printf("  Disk %s: %.1f%% used %s\n",path, perctangeUsed, status)
+	fmt.Printf("  Disk %s: %.1f%% used %s\n", path, perctangeUsed, status)
+	return status
 
 }
 
@@ -108,7 +110,7 @@ func getFileSystem() {
 	}
 	var rootTarget string
 	var homeTarget string
-	var bootTarget string	
+	var bootTarget string
 	var rootSource string
 	var homeSource string
 	var bootSource string
@@ -116,23 +118,21 @@ func getFileSystem() {
 	var homeFSType string
 	var bootFSType string
 
-
 	outputStr := string(output)
-	
 
 	lines := strings.Split(outputStr, "\n")
-	for _, line := range lines{
-		fields:= strings.Fields(line)
-		if len(fields) == 0{
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
 			continue
 		}
-		if fields[0] == "/"{
+		if fields[0] == "/" {
 			rootTarget = fields[0]
 			rootSource = fields[1]
 			rootFSType = fields[2]
 		}
 		if fields[0] == "/home" {
-			homeTarget =fields[0]	
+			homeTarget = fields[0]
 			homeSource = fields[1]
 			homeFSType = fields[2]
 
@@ -144,29 +144,30 @@ func getFileSystem() {
 
 		}
 
-		if rootFSType  == "btrfs"{
+		if rootFSType == "btrfs" {
 			rootSource = strings.Replace(rootSource, "[/@]", "", 1)
 			homeSource = strings.Replace(homeSource, "[/@home]", "", 1)
-		}	
-	}	
+		}
+	}
 
-	fmt.Printf("  %s %s %s\n", rootTarget, rootSource, rootFSType)	
+	fmt.Printf("  %s %s %s\n", rootTarget, rootSource, rootFSType)
 	checkDisk("/")
 
 	if rootSource != homeSource {
 		fmt.Printf("  %s %s %s\n", homeTarget, homeSource, homeFSType)
-		checkDisk("/home")	
-	} 
+		checkDisk("/home")
+	}
 
-	fmt.Printf("  %s %s %s\n", bootTarget, bootSource, bootFSType)		
+	fmt.Printf("  %s %s %s\n", bootTarget, bootSource, bootFSType)
 	checkDisk("/boot")
 
 }
 
-func checkMemory() {
+func checkMemory() string {
 	content, err := os.ReadFile("/proc/meminfo")
 	if err != nil {
-		log.Fatalf("  Failed to read file: %s", err)
+		fmt.Println("  Error:", err)
+		return "[ERROR]"
 	}
 
 	var totalMemory float64
@@ -180,7 +181,7 @@ func checkMemory() {
 			value, err := strconv.ParseFloat(fields[1], 64)
 			if err != nil {
 				fmt.Println(" Error: ", err)
-				return
+				return "[ERROR]"
 			}
 			totalMemory = value
 
@@ -190,15 +191,20 @@ func checkMemory() {
 			value, err := strconv.ParseFloat(fields[1], 64)
 			if err != nil {
 				fmt.Println("  Error:", err)
-				return
+				return "[ERROR]"
 			}
 			availableMemory = value
 		}
+	}
+	if totalMemory == 0 {
+		fmt.Println("  Error: Total Memory not found")
+		return "[ERROR]"
 	}
 	memoryUsed := totalMemory - availableMemory
 	perctangeUsedMem := (memoryUsed / totalMemory) * 100
 	status := healthStatus(perctangeUsedMem)
 	fmt.Printf("  Memory: %.1f%% used %s \n", perctangeUsedMem, status)
+	return status
 
 }
 
@@ -232,7 +238,7 @@ func readCPUStats() (totalTime float64, idleTime float64) {
 	return totalTime, idleTime
 }
 
-func checkCPU() {
+func checkCPU() string {
 
 	total1, idle1 := readCPUStats()
 	time.Sleep(1 * time.Second)
@@ -241,13 +247,14 @@ func checkCPU() {
 	totalChange := total2 - total1
 	if totalChange == 0 {
 		fmt.Println("  CPU usage: FAILED")
-		return
+		return "[ERROR]"
 	}
 	idleChange := idle2 - idle1
 	cpuUsage := (1 - (idleChange / totalChange)) * 100
 	status := healthStatus(cpuUsage)
 
 	fmt.Printf("  CPU usage: %.1f%% %s\n", cpuUsage, status)
+	return status
 
 }
 
@@ -293,29 +300,29 @@ func checkUptime() {
 	fmt.Printf("  Uptime: %d days %d hours %d minutes \n", days, hours, minutes)
 }
 
-func checkAverageLoad() {
+func checkAverageLoad() string {
 	content, err := os.ReadFile("/proc/loadavg")
 	if err != nil {
 		log.Fatalf("  Failed to read file: %s", err)
-		return
+		return "[ERROR]"
 	}
 	str := string(content)
 	fields := strings.Fields(str)
 	load1, err := strconv.ParseFloat(fields[0], 64)
 	if err != nil {
 		fmt.Println("  Error:", err)
-		return
+		return "[ERROR]"
 	}
 
 	load2, err := strconv.ParseFloat(fields[1], 64)
 	if err != nil {
 		fmt.Println("  Error:", err)
-		return
+		return "[ERROR]"
 	}
 	load3, err := strconv.ParseFloat(fields[2], 64)
 	if err != nil {
 		fmt.Println("  Error:", err)
-		return
+		return "[ERROR]"
 	}
 	cpuCount := runtime.NumCPU()
 
@@ -323,14 +330,14 @@ func checkAverageLoad() {
 	status := healthStatus(loadPercentage)
 
 	fmt.Printf("  Load Average: %.1f %.1f %.1f %s\n", load1, load2, load3, status)
-
+	return status
 }
 
-func checkSwap() {
+func checkSwap() string {
 	content, err := os.ReadFile("/proc/meminfo")
 	if err != nil {
-		log.Fatalf(" Failed to read file: %s ", err)
-		return
+		fmt.Println("  Error:", err)
+		return "[ERROR]"
 	}
 	var swapTotal float64
 	var swapFree float64
@@ -342,7 +349,7 @@ func checkSwap() {
 			value, err := strconv.ParseFloat(fields[1], 64)
 			if err != nil {
 				fmt.Println(" Error: ", err)
-				return
+				return "[ERROR]"
 			}
 			swapTotal = value
 		}
@@ -350,14 +357,14 @@ func checkSwap() {
 			value, err := strconv.ParseFloat(fields[1], 64)
 			if err != nil {
 				fmt.Println("  Error:", err)
-				return
+				return "[ERROR]"
 			}
 			swapFree = value
 		}
 	}
 	if swapTotal == 0 {
 		fmt.Println("  Swap: Not configured")
-		return
+		return "[ERROR]"
 	}
 
 	usedSwap := swapTotal - swapFree
@@ -365,6 +372,7 @@ func checkSwap() {
 	status := healthStatus(swapPerctangeUsed)
 
 	fmt.Printf("  Swap %.1f%% used %s\n", swapPerctangeUsed, status)
+	return status
 
 }
 func getRunningKernel() (string, error) {
@@ -403,44 +411,46 @@ func checkRebootRequired() bool {
 	return false
 }
 
-func checkTemp(){
+func checkTemp() string {
 	paths, err := filepath.Glob("/sys/class/hwmon/hwmon*")
 	if err != nil {
 		fmt.Println("  Error:", err)
-		return
+		return "[ERROR]"
 	}
-
 
 	for _, path := range paths {
 		namePath := filepath.Join(path, "name")
 
 		content, err := os.ReadFile(namePath)
-		if err != nil{
+		if err != nil {
 			fmt.Println("  Error:", err)
-			return
+			return "[ERROR]"
 		}
 		name := strings.TrimSpace(string(content))
-		if name == "coretemp"{
+		if name == "coretemp" {
 			tempPath := filepath.Join(path, "temp1_input")
 			tempContent, err := os.ReadFile(tempPath)
 			if err != nil {
 				fmt.Println(" Error:", err)
-				return
+				return "[ERROR]"
 			}
 			tempStr := strings.TrimSpace(string(tempContent))
 			temp, err := strconv.ParseFloat(tempStr, 64)
 			if err != nil {
 				fmt.Println("  Error:", err)
-				return
+				return "[ERROR]"
 			}
 			temp = temp / 1000
 			status := tempStatus(temp)
 			fmt.Printf("  CPU Temp: %v°C  %s\n", temp, status)
+			return status
 		}
 	}
+	fmt.Println("  CPU Temp: sensor not found")
+	return "[ERROR]"
 }
 
-func tempStatus( temp float64) string{
+func tempStatus(temp float64) string {
 	if temp <= 70 {
 		return "[OK]"
 	} else if temp <= 85 {
@@ -450,7 +460,7 @@ func tempStatus( temp float64) string{
 	}
 }
 
-func checkJounalErrors(){
+func checkJounalErrors() string {
 	cmd := exec.Command(
 		"journalctl",
 		"-p",
@@ -464,30 +474,48 @@ func checkJounalErrors(){
 
 	output, err := cmd.Output()
 	if err != nil {
-		fmt.Println("  Error:",err)
-		return
+		fmt.Println("  Error:", err)
+		return "[ERROR]"
 	}
 	journalStr := strings.TrimSpace(string(output))
 	if journalStr == "" {
 		count = 0
-	} else{
+	} else {
 		lines := strings.Split(journalStr, "\n")
 		count = len(lines)
 	}
-	status := journalStatus(count)
+	status := countStatus(count)
 	fmt.Printf("  Journal Errors (1h): %d %s\n", count, status)
+	return status
 
 }
 
-func journalStatus(count int) string {
+func countStatus(count int) string {
 	if count == 0 {
 		return "[OK]"
-	} else if count >= 1 && count <=5 {
+	} else if count >= 1 && count <= 5 {
 		return "[WARNING]"
-		
+
 	} else {
 		return "[CRITICAL]"
 	}
+}
+
+func overAllHealth(statuses []string) string {
+	overall := "[OK]"
+	for _, status := range statuses {
+		switch status {
+		case "[CRITICAL]":
+			return "[CRITICAL]"
+		case "[ERROR]":
+			overall = "[ERROR]"
+		case "[WARNING]":
+			if overall == "[OK]" {
+				overall = "[WARNING]"
+			}
+		}
+	}
+	return overall
 }
 
 func main() {
@@ -525,20 +553,32 @@ func main() {
 	getFileSystem()
 	fmt.Println()
 
-
 	fmt.Println("Health")
 
-	checkCPU()
-	checkTemp()
-	checkAverageLoad()
-	
-	checkDisk("/")
-	checkMemory()
-	checkSwap()
-	checkFailedServices()
-	checkJounalErrors()
+	cpuStatus := checkCPU()
+	tempStatus := checkTemp()
+	loadStatus := checkAverageLoad()
+
+	diskStatus := checkDisk("/")
+	memoryStatus := checkMemory()
+	swapStatus := checkSwap()
+	failedServiceStatus := checkFailedServices()
+	jounrnalStatus := checkJounalErrors()
 	checkUptime()
 	fmt.Println()
+
+	statuses := []string{
+		cpuStatus,
+		tempStatus,
+		memoryStatus,
+		swapStatus,
+		loadStatus,
+		diskStatus,
+		failedServiceStatus,
+		jounrnalStatus,
+	}
+	overall := overAllHealth(statuses)
+	fmt.Println("Overall Health:", overall)
 
 	fmt.Println("Packages")
 	checkUpdates()
