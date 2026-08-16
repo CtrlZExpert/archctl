@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"log"
 	"net/http"
@@ -608,41 +609,130 @@ func runUpdates() {
 		fmt.Println("  System is up to date")
 		return
 	}
-	if numUpdates > 0 {
-		for {
-			fmt.Print("  Would you like to update your system? (yes/no): ")
-			var answer string
-			fmt.Scan(&answer)
-			answer = strings.ToLower(answer)
-			if answer == "yes" || answer == "y" {
-				cmd := exec.Command("sudo", "pacman", "-Syu")
-				cmd.Stdin = os.Stdin
-				cmd.Stdout = os.Stdout
-				cmd.Stderr = os.Stderr
-				err := cmd.Run()
-				if err != nil {
-					fmt.Println("  Error:", err)
-					return
-				}
-				fmt.Println("  System update completed successfully")
-				runPackages()
-				return
-			}
-			if answer == "no" || answer == "n" {
-				fmt.Println("  Update cancelled")
-				return
-			}
-			if answer != "yes" && answer != "y" && answer != "no" && answer != "n" {
-				fmt.Printf("  Error: unexpected answer %q found\n", answer)
-				fmt.Println()
-				fmt.Print("  yes(y) / no(n): ")
-				fmt.Println()
+	prompt := "  Would you like to update your system? (yes/no): "
+	confirmUpdate := confirmAction(prompt)
+	if confirmUpdate {
+		cmd := exec.Command("sudo", "pacman", "-Syu")
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err := cmd.Run()
+		if err != nil {
+			fmt.Println("  Error:", err)
+			return
+		}
+		fmt.Println("  System update completed successfully")
+		runPackages()
+		return
+	}
+	fmt.Println("  Update cancelled")
+	return
 
+}
+
+func runClean() {
+	cmd := exec.Command("pacman", "-Qdtq")
+	orphanOutput, err := cmd.Output()
+	orphanStr := string(orphanOutput)
+	orphanPackages := strings.TrimSpace(orphanStr)
+
+	if orphanPackages == "" {
+		fmt.Println("  No orphan packes found")
+		return
+	}
+	if err != nil {
+		fmt.Println("  Error:", err)
+		return
+
+	}
+
+	fmt.Println(orphanPackages)
+	fmt.Println()
+	fmt.Println("Warning: orphan packages may still be manually useful")
+	fmt.Println("Review the list before confirming removal")
+	fmt.Println()
+
+	var packagesToRemove []string
+	orphanLines := strings.Split(orphanPackages, "\n")
+	packagesToKeep := selectPackagesToKeep()
+	for _, pkg := range orphanLines {
+		keep := false
+		for _, keepPackage := range packagesToKeep {
+			if pkg == keepPackage {
+				keep = true
+				break
 			}
 
 		}
+		if !keep {
+			packagesToRemove = append(packagesToRemove, pkg)
+		}
+
 	}
 
+	if len(packagesToRemove) == 0 {
+		fmt.Println("  Cleanup cancelled")
+		fmt.Println(packagesToRemove)
+		return
+	}
+	args := append([]string{"pacman", "-Rns"}, packagesToRemove...)
+
+	prompt := "Remove these orphan packages? (yes/no):  "
+	confirmClean := confirmAction(prompt)
+	if confirmClean {
+		cmd := exec.Command("sudo", args...)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		err := cmd.Run()
+		if err != nil {
+			fmt.Println("  Error:", err)
+			return
+		}
+		fmt.Println("  Packages have successfully been removed")
+		return
+
+	}
+	fmt.Println("  Cleanup cancelled")
+}
+func confirmAction(prompt string) bool {
+	fmt.Print(prompt)
+	for {
+		var answer string
+		fmt.Scan(&answer)
+		answer = strings.ToLower(answer)
+		if answer == "yes" || answer == "y" {
+			return true
+		}
+
+		if answer == "no" || answer == "n" {
+			return false
+		}
+		if answer != "yes" && answer != "y" && answer != "no" && answer != "n" {
+			fmt.Println()
+			fmt.Printf("Error: unexpected answer %q found\n", answer)
+			fmt.Println()
+			fmt.Print("  (y)es / (n)o: ")
+			fmt.Println()
+		}
+
+	}
+
+}
+
+func selectPackagesToKeep() []string {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Println("Enter orphan packages you to keep (space-separated):")
+	fmt.Println("Press Enter to remove all:")
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		fmt.Println("  Error reading input:", err)
+		return []string{}
+	}
+
+	input = strings.TrimSpace(input)
+	packages := strings.Fields(input)
+	return packages
 }
 
 func printHelp() {
@@ -654,6 +744,8 @@ func printHelp() {
 	fmt.Println("  health    Run health check")
 	fmt.Println("  system    Show system information")
 	fmt.Println("  packages  Show package/update status")
+	fmt.Println("  update    Update system")
+	fmt.Println("  clean     Find and remove orphan packages")
 	fmt.Println("Options:")
 	fmt.Println("  --help    Show this help message")
 	fmt.Println(" --version Show archctl version")
@@ -692,6 +784,8 @@ func main() {
 		runPackages()
 	case "update":
 		runUpdates()
+	case "clean":
+		runClean()
 	case "--help":
 		printHelp()
 	case "--version":
