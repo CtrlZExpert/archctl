@@ -45,18 +45,25 @@ func checkInternet() (bool, int64) {
 func checkUpdates() int {
 	path, err := exec.LookPath("checkupdates")
 	if err != nil {
-		fmt.Println("  Updates: FAILED (checkupdates not installed)")
+		fmt.Println("  Updates: FAILED (checkupdates is not available)")
 		return 0
 	}
 	cmd := exec.Command(path)
 	output, err := cmd.Output()
-	if err != nil {
-		fmt.Println("  Updates: FAILED (checkupdates not intstalled)")
+	str := string(output)
+	updateOutput := strings.TrimSpace(str)
+
+	if updateOutput == "" {
+		fmt.Println("  Updates: 0")
 		return 0
 	}
+	if err != nil {
+		fmt.Println("  Updates: FAILED (checkupdates failed to run)")
+		return 0
+	}
+	updates := strings.Split(updateOutput, "\n")
 
-	str := string(output)
-	count := strings.Count(str, "\n")
+	count := len(updates)
 	fmt.Println("  Updates: ", count)
 	return count
 
@@ -637,13 +644,12 @@ func runClean() {
 	orphanPackages := strings.TrimSpace(orphanStr)
 
 	if orphanPackages == "" {
-		fmt.Println("  No orphan packes found")
+		fmt.Println("  No orphan packages found")
 		return
 	}
 	if err != nil {
 		fmt.Println("  Error:", err)
 		return
-
 	}
 
 	fmt.Println(orphanPackages)
@@ -653,16 +659,34 @@ func runClean() {
 	fmt.Println()
 
 	var packagesToRemove []string
-	orphanLines := strings.Split(orphanPackages, "\n")
-	packagesToKeep := selectPackagesToKeep()
-	for _, pkg := range orphanLines {
+	orphanNames := strings.Split(orphanPackages, "\n")
+	orphanSet := make(map[string]bool)
+	var packagesToKeep []string
+	for _, name := range orphanNames {
+		orphanSet[name] = true
+	}
+	for {
+		packagesToKeep = selectPackagesToKeep()
+		valid := true
+
+		for _, item := range packagesToKeep {
+			if !orphanSet[item] {
+				fmt.Printf("Error: %q is not an orphan package\n", item)
+				valid = false
+			}
+		}
+		if valid {
+			break
+		}
+
+	}
+	for _, pkg := range orphanNames {
 		keep := false
 		for _, keepPackage := range packagesToKeep {
 			if pkg == keepPackage {
 				keep = true
 				break
 			}
-
 		}
 		if !keep {
 			packagesToRemove = append(packagesToRemove, pkg)
@@ -672,9 +696,13 @@ func runClean() {
 
 	if len(packagesToRemove) == 0 {
 		fmt.Println("  Cleanup cancelled")
-		fmt.Println(packagesToRemove)
 		return
 	}
+	fmt.Println("Packages to remove:")
+	for _, removePkg := range packagesToRemove {
+		fmt.Println(removePkg)
+	}
+	fmt.Println()
 	args := append([]string{"pacman", "-Rns"}, packagesToRemove...)
 
 	prompt := "Remove these orphan packages? (yes/no):  "
