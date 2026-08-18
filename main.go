@@ -509,6 +509,31 @@ func getJournalErrors() []string {
 	return journalSet
 
 }
+func getKernelErrors() []string {
+	cmd := exec.Command(
+		"journalctl",
+		"-k",
+		"-p",
+		"err",
+		"--since",
+		"1 hour ago",
+		"--no-pager",
+		"--quiet",
+	)
+	output, err := cmd.Output()
+	if err != nil {
+		fmt.Println("  Error:", err)
+		return []string{}
+	}
+	kernelStr := strings.TrimSpace(string(output))
+	if kernelStr == "" {
+		return []string{}
+	}
+	kernelSet := strings.Split(kernelStr, "\n")
+
+	return kernelSet
+
+}
 
 func countStatus(count int) string {
 	if count == 0 {
@@ -781,7 +806,8 @@ servicesLoop:
 
 			switch actionChoice {
 			case 1:
-				cmd := exec.Command("systemctl", "status", selectedService)
+				cmd := exec.Command(
+					"systemctl", "status", selectedService)
 				cmd.Stdin = os.Stdin
 				cmd.Stdout = os.Stdout
 				cmd.Stderr = os.Stderr
@@ -793,7 +819,12 @@ servicesLoop:
 					}
 				}
 			case 2:
-				cmd := exec.Command("journalctl", "-u", selectedService, "--since", "1 hour ago")
+				cmd := exec.Command(
+					"journalctl",
+					"-u", selectedService,
+					"--since",
+					"1 hour ago",
+				)
 				cmd.Stdin = os.Stdin
 				cmd.Stdout = os.Stdout
 				cmd.Stderr = os.Stderr
@@ -831,6 +862,86 @@ servicesLoop:
 
 		}
 
+	}
+}
+
+func runLog() {
+	logErrors := getJournalErrors()
+	numErrors := len(logErrors)
+	if numErrors == 0 {
+		fmt.Println("No journal errors found in the last hour")
+		return
+	}
+
+	fmt.Println("Journal Errors - Last Hour:")
+	for i, logEntry := range logErrors {
+		fmt.Printf("  %d. %s\n", i+1, logEntry)
+	}
+
+	var actionChoice int
+
+	for {
+		fmt.Println()
+		fmt.Println("1. Show all recent error logs")
+		fmt.Println("2. Show kernel errors")
+		fmt.Println("3. Show errors by service")
+		fmt.Println("4. Exit")
+		fmt.Println()
+		fmt.Print("Select an action: ")
+		fmt.Println()
+
+		fmt.Scan(&actionChoice)
+
+		switch actionChoice {
+		case 1:
+			fmt.Println("Recent Error Logs:")
+			for i, logEntry := range logErrors {
+				fmt.Printf("  %d. %s\n", i+1, logEntry)
+			}
+		case 2:
+			kernelErrs := getKernelErrors()
+			numKernelErrs := len(kernelErrs)
+			fmt.Println("Kernel Errors - Last Hour:")
+			if numKernelErrs == 0 {
+				fmt.Println("  No kernel errors in the last hour ")
+				continue
+			}
+			for i, kernelEntry := range kernelErrs {
+				fmt.Printf("  %d. %s\n", i+1, kernelEntry)
+			}
+		case 3:
+			fmt.Print("Enter service name: ")
+			var serviceName string
+			fmt.Scan(&serviceName)
+			fmt.Println("Error by Service:")
+			cmd := exec.Command(
+				"journalctl",
+				"-u",
+				serviceName,
+				"-p",
+				"err",
+				"--since",
+				"1 hour ago",
+				"--no-pager",
+				"--quiet",
+			)
+			output, err := cmd.Output()
+			if err != nil {
+				fmt.Println("  Error:", err)
+				continue
+			}
+			str := string(output)
+			service := strings.TrimSpace(str)
+			if service == "" {
+				fmt.Printf("  No error logs found for %s in the last hour\n", serviceName)
+				continue
+			}
+			fmt.Printf("  %s\n", service)
+		case 4:
+			return
+		default:
+			fmt.Println("Invalid selection")
+		}
 	}
 }
 
@@ -886,6 +997,7 @@ func printHelp() {
 	fmt.Println("  update    Update system")
 	fmt.Println("  clean     Find and remove orphan packages")
 	fmt.Println("  services  Show failed systemd services")
+	fmt.Println("  log       View and investigate recent journal errors")
 	fmt.Println("Options:")
 	fmt.Println("  --help    Show this help message")
 	fmt.Println(" --version Show archctl version")
@@ -928,6 +1040,8 @@ func main() {
 		runClean()
 	case "services":
 		runService()
+	case "log":
+		runLog()
 	case "--help":
 		printHelp()
 	case "--version":
