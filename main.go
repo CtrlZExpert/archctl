@@ -477,7 +477,16 @@ func tempStatus(temp float64) string {
 	}
 }
 
-func checkJounalErrors() string {
+func checkJournalErrors() string {
+	journalErrors := getJournalErrors()
+	count := len(journalErrors)
+	status := countStatus(count)
+	fmt.Printf("  Journal Errors (1h): %d %s\n", count, status)
+	return status
+
+}
+
+func getJournalErrors() []string {
 	cmd := exec.Command(
 		"journalctl",
 		"-p",
@@ -486,24 +495,18 @@ func checkJounalErrors() string {
 		"1 hour ago",
 		"--no-pager",
 	)
-
-	var count int
-
 	output, err := cmd.Output()
 	if err != nil {
 		fmt.Println("  Error:", err)
-		return "[ERROR]"
+		return []string{}
 	}
 	journalStr := strings.TrimSpace(string(output))
 	if journalStr == "" {
-		count = 0
-	} else {
-		lines := strings.Split(journalStr, "\n")
-		count = len(lines)
+		return []string{}
 	}
-	status := countStatus(count)
-	fmt.Printf("  Journal Errors (1h): %d %s\n", count, status)
-	return status
+	journalSet := strings.Split(journalStr, "\n")
+
+	return journalSet
 
 }
 
@@ -559,7 +562,7 @@ func runHealth() []string {
 	failedServiceStatus, failedServices := checkFailedServices()
 	numServices := len(failedServices)
 	fmt.Printf("  Failed Services: %d %s\n", numServices, failedServiceStatus)
-	jounrnalStatus := checkJounalErrors()
+	jounrnalStatus := checkJournalErrors()
 	checkUptime()
 	fmt.Println()
 	statuses := []string{
