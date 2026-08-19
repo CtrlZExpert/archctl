@@ -42,6 +42,7 @@ func printVersion() {
 }
 
 func main() {
+
 	fmt.Println("archctl - Arch Linux System Doctor")
 	fmt.Println("____________________________________")
 	fmt.Println()

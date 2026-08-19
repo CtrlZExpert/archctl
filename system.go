@@ -3,11 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 	"os/exec"
 	"strings"
-	"time"
 )
 
 func runSystem() {
@@ -29,7 +27,7 @@ func runSystem() {
 	if isInternet {
 		status := latencyStatus(elapsed)
 		fmt.Println("  Internet: OK")
-		fmt.Printf("  Latency: %d ms %s\n", elapsed, status)
+		fmt.Printf("  Latency: %.1f ms %s\n", elapsed, status)
 	} else {
 		fmt.Println("  Internet: Failed")
 	}
@@ -43,21 +41,6 @@ func checkArch() bool {
 	archOrNo := strings.Contains(string(content), "ID=arch")
 
 	return archOrNo
-}
-
-func checkInternet() (bool, int64) {
-	start := time.Now()
-	client := http.Client{
-		Timeout: 3 * time.Second,
-	}
-	resp, err := client.Get("https://google.com")
-	if err != nil {
-		return false, 0
-	}
-	defer resp.Body.Close()
-	elapsed := time.Since(start).Milliseconds()
-
-	return true, elapsed
 }
 
 func getRunningKernel() (string, error) {

@@ -37,7 +37,7 @@ func tempStatus(temp float64) string {
 	}
 }
 
-func latencyStatus(latency int64) string {
+func latencyStatus(latency float64) string {
 	if latency <= 300 {
 		return "[OK]"
 	} else if latency <= 1000 {

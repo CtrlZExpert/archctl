@@ -30,7 +30,6 @@ func runLog() {
 		fmt.Println("4. Exit")
 		fmt.Println()
 		fmt.Print("Select an action: ")
-		
 
 		fmt.Scan(&actionChoice)
 		fmt.Println()
@@ -39,7 +38,6 @@ func runLog() {
 			fmt.Println("  Invalid selection. Enter a num from 1-4")
 			continue
 		}
-				
 
 		switch validChoice {
 		case 1:
