@@ -25,11 +25,12 @@ func printHelp() {
 	fmt.Println("Commands:")
 	fmt.Println("  doctor    Run full system health check")
 	fmt.Println("  health    Run health check")
+	fmt.Println("  services  Show failed systemd services")
 	fmt.Println("  system    Show system information")
+	fmt.Println("  network   Show network information and connectivity")
 	fmt.Println("  packages  Show package/update status")
 	fmt.Println("  update    Update system")
 	fmt.Println("  clean     Find and remove orphan packages")
-	fmt.Println("  services  Show failed systemd services")
 	fmt.Println("  log       View and investigate recent journal errors")
 	fmt.Println("Options:")
 	fmt.Println("  --help    Show this help message")
@@ -76,6 +77,8 @@ func main() {
 		runService()
 	case "log":
 		runLog()
+	case "network":
+		runNetwork()
 	case "--help":
 		printHelp()
 	case "--version":

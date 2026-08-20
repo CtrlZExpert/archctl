@@ -115,19 +115,6 @@ func checkGateway(gateway string) bool {
 	return true
 }
 
-func checkDNSResolution() bool {
-	cmd := exec.Command(
-		"getent",
-		"hosts",
-		"google.com",
-	)
-	err := cmd.Run()
-	if err != nil {
-		return false
-	}
-	return true
-}
-
 func checkInternet() (bool, float64) {
 	cmd := exec.Command(
 		"ping",
@@ -157,4 +144,100 @@ func checkInternet() (bool, float64) {
 		}
 	}
 	return false, 0.0
+}
+
+func checkDNSResolution() bool {
+	cmd := exec.Command(
+		"getent",
+		"hosts",
+		"google.com",
+	)
+	err := cmd.Run()
+	if err != nil {
+		return false
+	}
+	return true
+}
+
+func runNetwork() {
+	interfaceName := getActiveInterface()
+	ipv4 := getIPv4Address(interfaceName)
+	defaultGateway := getDefaultGateway()
+	dnsServer := getDNSServer()
+	gatewayReachable := checkGateway(defaultGateway)
+	internetOK, latency := checkInternet()
+	dnsOK := checkDNSResolution()
+
+	fmt.Println("Network:")
+	fmt.Println("  Interface:", interfaceName)
+	fmt.Println("  IPv4:", ipv4)
+	fmt.Println("  Gateway:", defaultGateway)
+	fmt.Println("  DNS Server:", dnsServer)
+	fmt.Println()
+
+	gatewayStatus := networkStatus(gatewayReachable)
+	internetStatus := networkStatus(internetOK)
+	dnsStatus := networkStatus(dnsOK)
+	latencyState := latencyStatus(latency)
+	fmt.Println("Connectivity:")
+	fmt.Println("  Gateway:", gatewayStatus)
+	fmt.Println("  Internet:", internetStatus)
+	fmt.Println("  DNS Resolution:", dnsStatus)
+	fmt.Printf("  Latency: %.1f ms %s\n", latency, latencyState)
+
+	var actionChoice string
+
+	for {
+		fmt.Println()
+		fmt.Println("Network Action:")
+		fmt.Println("1. Ping gateway")
+		fmt.Println("2. Test internet connection")
+		fmt.Println("3. Test DNS resolution")
+		fmt.Println("4. Lookup Hostname")
+		fmt.Println("5. Exit")
+		fmt.Println()
+		fmt.Print("Select an action: ")
+
+		fmt.Scan(&actionChoice)
+		fmt.Println()
+		validChoice, err := strconv.Atoi(actionChoice)
+		if err != nil {
+			fmt.Println("  Invalid selection. Enter a num from 1-5")
+			continue
+		}
+
+		switch validChoice {
+		case 1:
+			fmt.Println("  Gateway:", networkStatus(checkGateway(defaultGateway)))
+		case 2:
+			internetOK, latency = checkInternet()
+			fmt.Println("  Internet:", networkStatus(internetOK))
+			fmt.Printf("  Latency: %.1f ms %s\n", latency, latencyStatus(latency))
+		case 3:
+			fmt.Println("  DNS Resolution:", networkStatus(checkDNSResolution()))
+		case 4:
+			var hostname string
+			fmt.Print("Enter hostname: ")
+			fmt.Scan(&hostname)
+			fmt.Println()
+
+			cmd := exec.Command(
+				"getent",
+				"hosts",
+				hostname,
+			)
+			output, err := cmd.Output()
+			if err != nil {
+				fmt.Println("  Hostname lookup failed")
+				continue
+			}
+			str := string(output)
+			fmt.Printf("  %s", str)
+
+		case 5:
+			return
+		}
+
+	}
+
 }
